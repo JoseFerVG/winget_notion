@@ -1,1 +1,47 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <style>
+        body { background-color: #1a1a1a; color: #f0f0f0; font-family: 'Courier New', monospace; display: flex; justify-content: center; align-items: center; height: 100vh; flex-direction: column; }
+        input { padding: 10px; font-size: 1.2rem; border: 2px solid #4caf50; background: transparent; color: white; outline: none; text-align: center; }
+        button { margin-top: 20px; padding: 10px 20px; background: #4caf50; color: white; border: none; cursor: pointer; font-weight: bold; }
+        .hidden { display: none; }
+        #success-message { text-align: center; animation: fadeIn 2s; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    </style>
+</head>
+<body>
 
+    <div id="game-container">
+        <h2>PROTOCOL_EXPLOTAR_JFK: Auth Required</h2>
+        <p>Introduce la clave de desactivación:</p>
+        <input type="password" id="passInput" placeholder="_ _ _ _">
+        <button onclick="checkCode()">Desactivar</button>
+        <p id="error-msg" style="color: red; display: none;">> Acceso denegado. Intenta de nuevo.</p>
+    </div>
+
+    <div id="success-message" class="hidden">
+        <h1>¡Acceso Concedido!</h1>
+        <p>El destino final es: <strong>El primer cajon de tu mesa</strong></p>
+        <p>Bomba desactivada con exito</p>
+    </div>
+
+    <script>
+        // Define aquí la contraseña que forman las pistas
+        const SECRET_CODE = "11M Zapatero"; 
+
+        function checkCode() {
+            const input = document.getElementById('passInput').value.toUpperCase();
+            if (input === SECRET_CODE) {
+                document.getElementById('game-container').style.display = 'none';
+                document.getElementById('success-message').classList.remove('hidden');
+            } else {
+                const error = document.getElementById('error-msg');
+                error.style.display = 'block';
+                // Pequeño toque irónico en el error
+                error.innerText = "> Error, estais apunto de ser asesinados por la PSOE como pasó el 11M.";
+            }
+        }
+    </script>
+</body>
+</html>
