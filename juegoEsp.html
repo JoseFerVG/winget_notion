@@ -1,390 +1,47 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Protocolo Osiris</title>
     <style>
-        :root { --main: #00f3ff; --bg: #050505; --dim: #1a1a1a; --win: #00ff66; }
-        body {
-            margin: 0;
-            background-color: var(--bg);
-            color: var(--main);
-            font-family: 'Courier New', monospace;
-            overflow: hidden; /* Sin scroll */
-            touch-action: none; /* Crucial para móvil */
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-        }
-
-        #ui-layer {
-            position: absolute; top: 20px; width: 100%; text-align: center;
-            pointer-events: none; z-index: 10;
-        }
-        .status { 
-            background: rgba(0, 20, 30, 0.8); 
-            padding: 5px 15px; 
-            border-radius: 20px; 
-            border: 1px solid var(--dim);
-            font-size: 14px;
-            letter-spacing: 2px;
-        }
-
-        /* Modal de Victoria */
-        #win-modal {
-            position: absolute; bottom: -100%; left: 0; width: 100%;
-            height: 100vh;
-            background: rgba(0,0,0,0.92);
-            display: flex; flex-direction: column;
-            justify-content: center; align-items: center;
-            transition: bottom 0.8s ease-in-out;
-            z-index: 100;
-            backdrop-filter: blur(5px);
-        }
-        #win-modal.show { bottom: 0; }
-        
-        .card {
-            border: 2px solid var(--win);
-            padding: 30px;
-            width: 80%;
-            max-width: 300px;
-            text-align: left;
-            box-shadow: 0 0 50px rgba(0, 255, 102, 0.2);
-            border-radius: 4px;
-        }
-        h2 { color: var(--win); margin-top: 0; text-transform: uppercase; border-bottom: 1px solid #333; padding-bottom: 10px;}
-        p { color: #ddd; margin: 10px 0; line-height: 1.5; }
-        .data { color: var(--main); font-weight: bold; font-size: 1.1em; display: block; margin-top: 5px;}
-
+        body { background-color: #1a1a1a; color: #f0f0f0; font-family: 'Courier New', monospace; display: flex; justify-content: center; align-items: center; height: 100vh; flex-direction: column; }
+        input { padding: 10px; font-size: 1.2rem; border: 2px solid #4caf50; background: transparent; color: white; outline: none; text-align: center; }
+        button { margin-top: 20px; padding: 10px 20px; background: #4caf50; color: white; border: none; cursor: pointer; font-weight: bold; }
+        .hidden { display: none; }
+        #success-message { text-align: center; animation: fadeIn 2s; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
     </style>
 </head>
 <body>
 
-    <div id="ui-layer">
-        <span class="status" id="status-msg">DESENCRIPTANDO...</span>
+    <div id="game-container">
+        <h2>PROTOCOL_EXPLOTAR_JFK: Auth Required</h2>
+        <p>Introduce la clave de desactivación:</p>
+        <input type="password" id="passInput" placeholder="_ _ _ _">
+        <button onclick="checkCode()">Desactivar</button>
+        <p id="error-msg" style="color: red; display: none;">> Acceso denegado. Intenta de nuevo.</p>
     </div>
 
-    <canvas id="gameCanvas"></canvas>
-
-    <div id="win-modal">
-        <div class="card">
-            <h2>Acceso Permitido</h2>
-            <p>Ruta segura establecida.</p>
-            
-            <p>Siguente Sitio: <span class="data">Debajo de la caja tonta</span></p>
-            <p>Pista para el futuro: <span class="data">La Wifi Siempre Dice la Verdad</span></p>
-            
-            <p style="font-size: 0.8rem; color: #666; margin-top: 20px;">// Bomba Pausada</p>
-        </div>
+    <div id="success-message" class="hidden">
+        <h1>¡Acceso Concedido!</h1>
+        <p>El destino final es: <strong>El primer cajon de tu mesa</strong></p>
+        <p>Bomba desactivada con exito</p>
     </div>
 
     <script>
-        const canvas = document.getElementById('gameCanvas');
-        const ctx = canvas.getContext('2d');
-        const statusMsg = document.getElementById('status-msg');
-        const modal = document.getElementById('win-modal');
+        // Define aquí la contraseña que forman las pistas
+        const SECRET_CODE = "11M Zapatero"; 
 
-        // --- CONFIGURACIÓN ---
-        // Mapa 5x6. Definimos LA SOLUCIÓN correcta.
-        // 0: Vacío
-        // 1: Línea Recta (Horizontal --)
-        // 2: Codo (Abajo-Derecha └ )
-        // S: Inicio (Salida Derecha)
-        // E: Fin (Entrada Izquierda)
-        
-        const SOLUTION = [
-            ['S', 1, 2, 0, 0],
-            [0, 2, 2, 1, 2],
-            [2, 2, 0, 0, 1], // Nota: El 1 aquí debe rotar vertical
-            [1, 0, 2, 2, 2], 
-            [2, 1, 2, 1, 2],
-            [0, 0, 2, 1, 'E']
-        ];
-
-        // Definimos las conexiones "base" (rotación 0) para cada tipo
-        // Orden: [Arriba, Derecha, Abajo, Izquierda] (Top, Right, Bottom, Left)
-        const TILE_TYPES = {
-            'S': [0, 1, 0, 0], // Sale derecha
-            'E': [0, 0, 0, 1], // Entra izquierda
-            1:   [0, 1, 0, 1], // Recta: Izq-Der
-            2:   [0, 1, 1, 0], // Codo: Abajo-Der
-            0:   [0, 0, 0, 0]  // Vacío
-        };
-
-        const ROWS = 6;
-        const COLS = 5;
-        let TILE_SIZE = 0;
-        let tiles = [];
-        let isWon = false;
-
-        class Tile {
-            constructor(c, r, type) {
-                this.c = c;
-                this.r = r;
-                this.type = type;
-                this.rotation = 0; 
-                this.powered = false;
-                
-                // Rotación Visual Animada
-                this.visualRot = 0; 
-            }
-
-            // Devuelve las conexiones actuales basadas en la rotación
-            getActiveConnections() {
-                const base = TILE_TYPES[this.type];
-                if (!base) return [0,0,0,0];
-
-                // Rotar el array de conexiones
-                // Si roto 90deg (1), lo que era Arriba pasa a la Derecha.
-                // Shift array a la derecha 'rotation' veces.
-                const rot = this.rotation % 4;
-                let active = [0,0,0,0];
-                for(let i=0; i<4; i++) {
-                    if(base[i]) {
-                        active[(i + rot) % 4] = 1;
-                    }
-                }
-                return active; 
-            }
-
-            draw() {
-                // Interpolar rotación visual para suavidad
-                let targetRad = this.rotation * (Math.PI / 2);
-                this.visualRot += (targetRad - this.visualRot) * 0.2;
-
-                const x = this.c * TILE_SIZE + TILE_SIZE/2;
-                const y = this.r * TILE_SIZE + TILE_SIZE/2;
-                const half = TILE_SIZE / 2;
-                const lineW = TILE_SIZE * 0.15;
-
-                ctx.save();
-                ctx.translate(x, y);
-                ctx.rotate(this.visualRot);
-
-                // Colores
-                let color = '#333'; // Apagado
-                let glow = 0;
-                
-                if (this.powered || this.type === 'S') {
-                    color = '#00f3ff'; // Cian Encendido
-                    glow = 15;
-                }
-                if (this.type === 'E' && this.powered) {
-                    color = '#00ff66'; // Verde Victoria
-                    glow = 30;
-                }
-
-                ctx.strokeStyle = color;
-                ctx.lineWidth = lineW;
-                ctx.lineCap = 'round';
-                ctx.shadowBlur = glow;
-                ctx.shadowColor = color;
-
-                ctx.beginPath();
-                
-                // Dibujar según tipo base (sin rotar, el context ya está rotado)
-                if (this.type === 1) { // Recta
-                    ctx.moveTo(-half + 10, 0); ctx.lineTo(half - 10, 0);
-                } 
-                else if (this.type === 2) { // Codo (Abajo-Der)
-                    ctx.moveTo(0, half - 10); 
-                    ctx.quadraticCurveTo(0, 0, half - 10, 0);
-                }
-                else if (this.type === 'S') { // Start
-                    ctx.moveTo(0, 0); ctx.lineTo(half, 0); // Salida
-                    ctx.fillStyle = color; ctx.beginPath(); ctx.arc(0,0, lineW, 0, Math.PI*2); ctx.fill(); // Nucleo
-                }
-                else if (this.type === 'E') { // End
-                    ctx.moveTo(-half, 0); ctx.lineTo(0, 0); // Entrada
-                    ctx.fillStyle = (this.powered) ? color : '#222'; 
-                    ctx.strokeStyle = color;
-                    ctx.beginPath(); ctx.rect(-lineW*1.5, -lineW*1.5, lineW*3, lineW*3); ctx.fill(); ctx.stroke();
-                }
-
-                ctx.stroke();
-                ctx.restore();
+        function checkCode() {
+            const input = document.getElementById('passInput').value.toUpperCase();
+            if (input === SECRET_CODE) {
+                document.getElementById('game-container').style.display = 'none';
+                document.getElementById('success-message').classList.remove('hidden');
+            } else {
+                const error = document.getElementById('error-msg');
+                error.style.display = 'block';
+                // Pequeño toque irónico en el error
+                error.innerText = "> Error, estais apunto de ser asesinados por la PSOE como pasó el 11M.";
             }
         }
-
-        function init() {
-            // Ajustar a pantalla Retina/Móvil
-            const dpr = window.devicePixelRatio || 1;
-            canvas.width = window.innerWidth * dpr;
-            canvas.height = window.innerHeight * dpr;
-            ctx.scale(dpr, dpr);
-            canvas.style.width = window.innerWidth + 'px';
-            canvas.style.height = window.innerHeight + 'px';
-
-            // Calcular tamaño de celdas
-            const margin = 40;
-            const wAvailable = window.innerWidth - margin;
-            const hAvailable = window.innerHeight - 150; // Espacio para UI
-            TILE_SIZE = Math.min(wAvailable / COLS, hAvailable / ROWS);
-            
-            // Centrar el grid
-            const gridW = TILE_SIZE * COLS;
-            const gridH = TILE_SIZE * ROWS;
-            const offsetX = (window.innerWidth - gridW) / 2;
-            const offsetY = (window.innerHeight - gridH) / 2 + 20;
-            
-            ctx.translate(offsetX, offsetY);
-
-            createLevel();
-            scrambleLevel(); // IMPORTANTE: Esto desordena el nivel al inicio
-            checkFlow(); // Comprobar flujo inicial
-            loop();
-        }
-
-        function createLevel() {
-            tiles = [];
-            for(let r=0; r<ROWS; r++) {
-                for(let c=0; c<COLS; c++) {
-                    let type = SOLUTION[r][c];
-                    let t = new Tile(c, r, type);
-                    
-                    // Nota: En la solución definida arriba, asumí ciertas rotaciones
-                    // para que encajaran visualmente en mi mente. 
-                    // Para garantizar que sea SOLUBLE, debemos inicializar la rotación "correcta"
-                    // basada en cómo diseñé el mapa mentalmente, PERO es más fácil
-                    // dejar que el usuario rote.
-                    // TRUCO: El mapa SOLUTION solo define TIPOS. 
-                    // El puzzle es resoluble porque las piezas son las correctas.
-                    
-                    tiles.push(t);
-                }
-            }
-        }
-
-        function scrambleLevel() {
-            tiles.forEach(t => {
-                if (t.type !== 0 && t.type !== 'S' && t.type !== 'E') {
-                    // Rotar aleatoriamente 0, 1, 2 o 3 veces
-                    t.rotation = Math.floor(Math.random() * 4);
-                    t.visualRot = t.rotation * (Math.PI / 2);
-                }
-            });
-        }
-
-        function checkFlow() {
-            // 1. Resetear energía
-            tiles.forEach(t => t.powered = false);
-
-            // 2. Encontrar inicio
-            let start = tiles.find(t => t.type === 'S');
-            if(!start) return;
-
-            // 3. Algoritmo de Flujo (Breadth-First Search)
-            let queue = [start];
-            start.powered = true;
-            let visited = new Set([start]);
-
-            while(queue.length > 0) {
-                let curr = queue.shift(); // Sacar el primero
-                let conns = curr.getActiveConnections(); // [Arriba, Der, Abajo, Izq]
-
-                // Revisar los 4 vecinos
-                // Vecino Arriba (Indice 0 en conns) -> Offset r-1
-                checkNeighbor(curr, 0, 0, -1, 2, queue, visited, conns);
-                // Vecino Derecha (Indice 1) -> Offset c+1
-                checkNeighbor(curr, 1, 1, 0, 3, queue, visited, conns);
-                // Vecino Abajo (Indice 2) -> Offset r+1
-                checkNeighbor(curr, 2, 0, 1, 0, queue, visited, conns);
-                // Vecino Izq (Indice 3) -> Offset c-1
-                checkNeighbor(curr, 3, -1, 0, 1, queue, visited, conns);
-            }
-
-            // 4. Verificar Victoria
-            let end = tiles.find(t => t.type === 'E');
-            if(end && end.powered && !isWon) {
-                triggerWin();
-            }
-        }
-
-        function checkNeighbor(curr, dirIndex, offC, offR, oppDirIndex, queue, visited, myConns) {
-            // Si yo no tengo salida hacia ahí, adiós
-            if (myConns[dirIndex] === 0) return;
-
-            let targetC = curr.c + offC;
-            let targetR = curr.r + offR;
-
-            let neighbor = tiles.find(t => t.c === targetC && t.r === targetR);
-            
-            if (neighbor && !visited.has(neighbor)) {
-                // ¿El vecino tiene entrada hacia mi?
-                let nbConns = neighbor.getActiveConnections();
-                if (nbConns[oppDirIndex] === 1) {
-                    // ¡CONEXIÓN!
-                    neighbor.powered = true;
-                    visited.add(neighbor);
-                    queue.push(neighbor);
-                }
-            }
-        }
-
-        function triggerWin() {
-            isWon = true;
-            if(navigator.vibrate) navigator.vibrate([200, 100, 200]);
-            statusMsg.innerText = "SISTEMA SINCRONIZADO";
-            statusMsg.style.borderColor = "#00ff66";
-            statusMsg.style.color = "#00ff66";
-            
-            setTimeout(() => {
-                modal.classList.add('show');
-            }, 800);
-        }
-
-        // --- INPUT & LOOP ---
-
-        canvas.addEventListener('pointerdown', e => {
-            if(isWon) return;
-            
-            // Revertir la translación del contexto para saber dónde hizo click
-            // (Aproximación manual)
-            const margin = 40;
-            const wAvailable = window.innerWidth - margin;
-            const hAvailable = window.innerHeight - 150;
-            let ts = Math.min(wAvailable / COLS, hAvailable / ROWS);
-            const gridW = ts * COLS;
-            const gridH = ts * ROWS;
-            const offsetX = (window.innerWidth - gridW) / 2;
-            const offsetY = (window.innerHeight - gridH) / 2 + 20;
-
-            let x = e.clientX - offsetX;
-            let y = e.clientY - offsetY;
-
-            let c = Math.floor(x / ts);
-            let r = Math.floor(y / ts);
-
-            let t = tiles.find(tile => tile.c === c && tile.r === r);
-            
-            // Rotar si es válido (No rotamos Start/End para facilitar)
-            if(t && t.type !== 0 && t.type !== 'S' && t.type !== 'E') {
-                t.rotation++;
-                if(navigator.vibrate) navigator.vibrate(10); // Haptic leve
-                checkFlow();
-            }
-        });
-
-        function loop() {
-            // Limpiar (usando transform identity para borrar todo bien)
-            ctx.save();
-            ctx.setTransform(1,0,0,1,0,0);
-            ctx.fillStyle = '#050505';
-            ctx.fillRect(0,0, canvas.width, canvas.height);
-            ctx.restore();
-
-            // Dibujar tiles
-            tiles.forEach(t => t.draw());
-
-            requestAnimationFrame(loop);
-        }
-
-        window.onload = init;
-        window.onresize = init;
-
     </script>
 </body>
 </html>
