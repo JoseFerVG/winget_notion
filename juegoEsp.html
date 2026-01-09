@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>SYSTEM_LOCK // OVERRIDE</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #050505; /* Negro casi absoluto */
+            font-family: 'Courier New', Courier, monospace;
+            touch-action: none; /* Bloquea el scroll nativo */
+        }
+        canvas { display: block; }
+        
+        #ui {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            text-align: center;
+            width: 100%;
+        }
+
+        /* HUD Táctico */
+        .hud-text {
+            color: rgba(0, 255, 200, 0.5);
+            font-size: 12px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            transition: all 0.5s;
+        }
+        
+        #lock-status {
+            margin-top: 350px; /* Debajo del lock */
+            font-weight: bold;
+        }
+
+        /* Mensaje Final */
+        #success-modal {
+            display: none;
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 10, 20, 0.95);
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+            opacity: 0;
+            transition: opacity 1s;
+        }
+        .visible { opacity: 1 !important; }
+        
+        .card {
+            background: #111;
+            border: 1px solid #00ffcc;
+            padding: 30px;
+            max-width: 80%;
+            box-shadow: 0 0 50px rgba(0, 255, 204, 0.2);
+            text-align: left;
+        }
+        h2 { color: #00ffcc; margin-top: 0; text-transform: uppercase; border-bottom: 1px solid #333; padding-bottom: 10px; }
+        p { color: #ccc; line-height: 1.6; }
+    </style>
+</head>
+<body>
+
+    <div id="ui">
+        <div class="hud-text" style="margin-bottom: 350px;">Security Layer: ACTIVE</div>
+        <div id="lock-status" class="hud-text">Align the pathways</div>
+    </div>
+
+    <canvas id="canvas"></canvas>
+
+    <div id="success-modal">
+        <div class="card">
+            <h2>Acceso Concedido</h2>
+            <p>Protocolo completado.</p>
+            <p><strong>Ubicación:</strong> Taquilla 42, Estación Central.</p>
+            <p><strong>Código:</strong> 1403</p>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const statusText = document.getElementById('lock-status');
+        const successModal = document.getElementById('success-modal');
+
+        let width, height, centerX, centerY;
+        let scale = 1; // Para pantallas retina
+
+        // Configuración de los Anillos
+        const RINGS_CONFIG = [
+            { radius: 80, width: 15, speed: 0, angle: Math.random() * 6.28, friction: 0.96, solution: Math.PI / 2, color: '#ff0055' }, // Interior
+            { radius: 120, width: 20, speed: 0, angle: Math.random() * 6.28, friction: 0.95, solution: Math.PI / 2, color: '#00ccff' }, // Medio
+            { radius: 160, width: 10, speed: 0, angle: Math.random() * 6.28, friction: 0.92, solution: Math.PI / 2, color: '#ffff00' }  // Exterior
+        ];
+        
+        // Tolerancia de éxito (en radianes). Cuanto menor, más difícil.
+        const TOLERANCE = 0.15; 
+        
+        let activeRingIndex = -1;
+        let lastAngle = 0;
+        let isDragging = false;
+        let unlocked = false;
+
+        // Partículas para el efecto final
+        let particles = [];
+
+        function init() {
+            // Ajuste DPI para nitidez máxima
+            const dpr = window.devicePixelRatio || 1;
+            canvas.width = window.innerWidth * dpr;
+            canvas.height = window.innerHeight * dpr;
+            ctx.scale(dpr, dpr);
+            
+            width = window.innerWidth;
+            height = window.innerHeight;
+            centerX = width / 2;
+            centerY = height / 2;
+
+            // Ajustar radios según pantalla
+            const minDim = Math.min(width, height);
+            RINGS_CONFIG[0].radius = minDim * 0.15;
+            RINGS_CONFIG[1].radius = minDim * 0.25;
+            RINGS_CONFIG[2].radius = minDim * 0.35;
+
+            requestAnimationFrame(loop);
+        }
+
+        // --- LÓGICA MATEMÁTICA ---
+
+        // Obtener el ángulo del toque respecto al centro (atan2 devuelve -PI a PI)
+        function getTouchAngle(x, y) {
+            return Math.atan2(y - centerY, x - centerX);
+        }
+
+        // Normalizar ángulo entre 0 y 2PI
+        function normalizeAngle(angle) {
+            let a = angle % (Math.PI * 2);
+            if (a < 0) a += Math.PI * 2;
+            return a;
+        }
+
+        // Distancia euclidiana
+        function getDistance(x, y) {
+            return Math.hypot(x - centerX, y - centerY);
+        }
+
+        function checkLock() {
+            if (unlocked) return;
+            
+            let allAligned = true;
+            RINGS_CONFIG.forEach(ring => {
+                // La diferencia entre el ángulo actual normalizado y la solución
+                // La solución es PI/2 (90 grados, arriba vertical)
+                // Ajustamos porque el dibujo se hace rotado
+                let current = normalizeAngle(ring.angle);
+                let target = ring.solution;
+                
+                // Distancia angular más corta
+                let diff = Math.abs(current - target);
+                if (diff > Math.PI) diff = (Math.PI * 2) - diff;
+
+                if (diff > TOLERANCE) allAligned = false;
+            });
+
+            if (allAligned) {
+                unlockSystem();
+            }
+        }
+
+        function unlockSystem() {
+            unlocked = true;
+            statusText.style.color = "#00ffcc";
+            statusText.innerText = "SEQUENCE ACCEPTED";
+            statusText.style.letterSpacing = "5px";
+            
+            // Explosión de partículas
+            for(let i=0; i<100; i++) {
+                particles.push({
+                    x: centerX, y: centerY,
+                    vx: (Math.random() - 0.5) * 10,
+                    vy: (Math.random() - 0.5) * 10,
+                    life: 1.0,
+                    color: i % 2 === 0 ? '#00ffcc' : '#ff0055'
+                });
+            }
+
+            setTimeout(() => {
+                successModal.style.display = 'flex';
+                setTimeout(() => successModal.classList.add('visible'), 50);
+            }, 2000);
+        }
+
+        // --- INPUT HANDLING ---
+
+        function handleStart(x, y) {
+            if (unlocked) return;
+            const dist = getDistance(x, y);
+            
+            // Detectar qué anillo se toca
+            activeRingIndex = -1;
+            // Revisamos del exterior al interior
+            for (let i = RINGS_CONFIG.length - 1; i >= 0; i--) {
+                const r = RINGS_CONFIG[i];
+                // Margen de error de 20px para el dedo
+                if (dist >= r.radius - 20 && dist <= r.radius + 20) {
+                    activeRingIndex = i;
+                    break;
+                }
+            }
+
+            if (activeRingIndex !== -1) {
+                isDragging = true;
+                lastAngle = getTouchAngle(x, y);
+                RINGS_CONFIG[activeRingIndex].speed = 0; // Parar inercia al tocar
+            }
+        }
+
+        function handleMove(x, y) {
+            if (!isDragging || unlocked) return;
+            const currentAngle = getTouchAngle(x, y);
+            let delta = currentAngle - lastAngle;
+
+            // Corregir salto de -PI a PI
+            if (delta > Math.PI) delta -= Math.PI * 2;
+            if (delta < -Math.PI) delta += Math.PI * 2;
+
+            RINGS_CONFIG[activeRingIndex].angle += delta;
+            lastAngle = currentAngle;
+        }
+
+        function handleEnd() {
+            isDragging = false;
+            activeRingIndex = -1;
+            checkLock();
+        }
+
+        // Event Listeners (Mouse & Touch)
+        window.addEventListener('mousedown', e => handleStart(e.clientX, e.clientY));
+        window.addEventListener('mousemove', e => handleMove(e.clientX, e.clientY));
+        window.addEventListener('mouseup', handleEnd);
+
+        window.addEventListener('touchstart', e => handleStart(e.touches[0].clientX, e.touches[0].clientY), {passive: false});
+        window.addEventListener('touchmove', e => { e.preventDefault(); handleMove(e.touches[0].clientX, e.touches[0].clientY); }, {passive: false});
+        window.addEventListener('touchend', handleEnd);
+
+
+        // --- RENDER LOOP ---
+
+        function drawRing(ctx, ring, index) {
+            const r = ring.radius;
+            
+            ctx.save();
+            ctx.translate(centerX, centerY);
+            ctx.rotate(ring.angle);
+
+            // Estilo Cyberpunk
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = unlocked ? '#00ffcc' : ring.color;
+            ctx.strokeStyle = unlocked ? '#00ffcc' : ring.color;
+            ctx.lineWidth = unlocked ? 4 : 2;
+
+            // Dibujar el círculo base (casi completo)
+            // Dejamos un hueco (la "puerta") en PI/2
+            ctx.beginPath();
+            // Dibujamos el arco desde 0.2 a 2PI-0.2 (hueco arriba si angulo es 0)
+            // Queremos que el hueco esté alineado con la solución.
+            // Solución es PI/2.
+            // Dibujamos un arco grande que deja un hueco visible.
+            ctx.arc(0, 0, r, 0.2, Math.PI * 2 - 0.2); 
+            ctx.stroke();
+
+            // Decoraciones tecnológicas en el anillo
+            ctx.fillStyle = ctx.strokeStyle;
+            for(let i=0; i<8; i++) {
+                let rot = (Math.PI * 2 / 8) * i;
+                let size = (i === 0) ? 6 : 2; // El marcador principal es más grande
+                
+                ctx.beginPath();
+                // Posicionar elementos decorativos
+                ctx.arc(Math.cos(rot)*r, Math.sin(rot)*r, size, 0, Math.PI*2);
+                ctx.fill();
+            }
+
+            // Indicador de "Norte" visual (el hueco)
+            // Dibujar un triángulo apuntando al centro en el hueco
+            ctx.beginPath();
+            ctx.moveTo(r + 10, 0);
+            ctx.lineTo(r - 10, 0);
+            ctx.lineTo(r, 10); // Triángulo en el eje X (que rotará)
+            // No, mejor algo más simple: un arco brillante en la apertura
+            
+            ctx.restore();
+        }
+
+        function drawTargetZone() {
+            // Dibujar la zona donde deben alinearse los huecos (Arriba, PI/2)
+            // Pero en canvas coordinates, 0 es derecha. Arriba es -PI/2 (270deg).
+            // Espera, la lógica de rotación arriba usa PI/2 como solución.
+            
+            ctx.save();
+            ctx.translate(centerX, centerY);
+            
+            // Línea guía sutil
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(0, height); // Abajo (PI/2)
+            ctx.stroke();
+
+            // Triángulo indicador fijo abajo (Target)
+            ctx.fillStyle = '#fff';
+            ctx.beginPath();
+            ctx.moveTo(-10, RINGS_CONFIG[2].radius + 30);
+            ctx.lineTo(10, RINGS_CONFIG[2].radius + 30);
+            ctx.lineTo(0, RINGS_CONFIG[2].radius + 20);
+            ctx.fill();
+
+            ctx.restore();
+        }
+
+        function loop() {
+            ctx.clearRect(0, 0, width, height);
+            
+            // Fondo grid sutil
+            ctx.strokeStyle = 'rgba(255,255,255,0.03)';
+            ctx.lineWidth = 1;
+            // ... (podrías dibujar grid aquí si quieres)
+
+            drawTargetZone();
+
+            RINGS_CONFIG.forEach((ring, index) => {
+                drawRing(ctx, ring, index);
+            });
+
+            // Animación de partículas al ganar
+            if (unlocked && particles.length > 0) {
+                particles.forEach((p, i) => {
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    p.life -= 0.02;
+                    ctx.globalAlpha = p.life;
+                    ctx.fillStyle = p.color;
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, 3, 0, Math.PI*2);
+                    ctx.fill();
+                    if(p.life <= 0) particles.splice(i, 1);
+                });
+                ctx.globalAlpha = 1;
+            }
+
+            requestAnimationFrame(loop);
+        }
+
+        init();
+        window.addEventListener('resize', init);
+
+    </script>
+</body>
+</html>
