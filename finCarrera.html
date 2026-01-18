@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fin de Carrera | JFK</title>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;500;700&family=Playfair+Display:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --glass-bg: rgba(255, 255, 255, 0.05);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --text-color: #ffffff;
+            --accent-color: #a5f3fc; /* Cian suave */
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: #0f172a; /* Azul oscuro profundo */
+            color: var(--text-color);
+            font-family: 'Montserrat', sans-serif;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* --- Fondo Animado (Aurora) --- */
+        .ambient-light {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(80px);
+            opacity: 0.6;
+            animation: float 10s infinite ease-in-out alternate;
+            z-index: 0;
+        }
+
+        .light-1 {
+            top: -10%;
+            left: -10%;
+            width: 50vw;
+            height: 50vw;
+            background: radial-gradient(circle, #4f46e5, transparent);
+            animation-duration: 15s;
+        }
+
+        .light-2 {
+            bottom: -10%;
+            right: -10%;
+            width: 60vw;
+            height: 60vw;
+            background: radial-gradient(circle, #db2777, transparent); /* Rosa/Magenta */
+            animation-duration: 12s;
+            animation-delay: -2s;
+        }
+
+        .light-3 {
+            top: 40%;
+            left: 40%;
+            width: 30vw;
+            height: 30vw;
+            background: radial-gradient(circle, #06b6d4, transparent); /* Cian */
+            animation-duration: 18s;
+            animation-delay: -5s;
+        }
+
+        @keyframes float {
+            0% { transform: translate(0, 0) scale(1); }
+            100% { transform: translate(20px, -20px) scale(1.1); }
+        }
+
+        /* --- Contenedor de Cristal --- */
+        .container {
+            position: relative;
+            z-index: 10;
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            padding: 3rem 4rem;
+            text-align: center;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            max-width: 90%;
+            width: 800px;
+            transition: transform 0.3s ease;
+        }
+
+        .container:hover {
+            transform: translateY(-5px);
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        h1 {
+            font-family: 'Playfair Display', serif;
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+            font-weight: 400;
+            letter-spacing: 1px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .subtitle {
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            opacity: 0.7;
+            margin-bottom: 3rem;
+        }
+
+        /* --- El Contador --- */
+        .countdown {
+            display: flex;
+            justify-content: center;
+            gap: 2rem;
+            flex-wrap: wrap;
+        }
+
+        .time-box {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-width: 100px;
+        }
+
+        .number {
+            font-size: 4rem;
+            font-weight: 700;
+            line-height: 1;
+            background: -webkit-linear-gradient(#fff, #cbd5e1);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-variant-numeric: tabular-nums; /* Evita que los números salten */
+        }
+
+        .label {
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-top: 10px;
+            opacity: 0.6;
+        }
+
+        .separator {
+            font-size: 3rem;
+            font-weight: 300;
+            color: rgba(255, 255, 255, 0.3);
+            margin-top: -10px;
+        }
+
+        /* --- Footer --- */
+        .footer {
+            margin-top: 3rem;
+            font-size: 0.8rem;
+            opacity: 0.4;
+            font-style: italic;
+            font-family: 'Playfair Display', serif;
+        }
+
+        /* --- Responsive --- */
+        @media (max-width: 768px) {
+            h1 { font-size: 1.8rem; }
+            .container { padding: 2rem; }
+            .number { font-size: 2.5rem; }
+            .countdown { gap: 1rem; }
+            .separator { display: none; }
+            .time-box { min-width: 70px; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="ambient-light light-1"></div>
+    <div class="ambient-light light-2"></div>
+    <div class="ambient-light light-3"></div>
+
+    <div class="container">
+        <h1>El Nuevo Comienzo</h1>
+        <div class="subtitle">Días restantes hasta el fin de mi carrera</div>
+        
+        <div class="countdown" id="countdown">
+            <div class="time-box">
+                <span class="number" id="days">00</span>
+                <span class="label">Días</span>
+            </div>
+            <div class="separator">:</div>
+
+            <div class="time-box">
+                <span class="number" id="hours">00</span>
+                <span class="label">Horas</span>
+            </div>
+            <div class="separator">:</div>
+
+            <div class="time-box">
+                <span class="number" id="minutes">00</span>
+                <span class="label">Minutos</span>
+            </div>
+            <div class="separator">:</div>
+
+            <div class="time-box">
+                <span class="number" id="seconds">00</span>
+                <span class="label">Segundos</span>
+            </div>
+        </div>
+
+        <div class="footer">
+            "La paciencia es amarga, pero su fruto es dulce." — Aristóteles
+        </div>
+    </div>
+
+    <script>
+        function updateCountdown() {
+            const targetDate = new Date("July 1, 2028 00:00:00").getTime();
+            const now = new Date().getTime();
+            const difference = targetDate - now;
+
+            if (difference < 0) {
+                document.querySelector(".container").innerHTML = "<h1>¡Objetivo Alcanzado!</h1><div class='subtitle'>Ingeniero en Informática</div>";
+                return;
+            }
+
+            const days = Math.floor(difference / (1000 * 60 * 60 * 24));
+            const hours = Math.floor((difference % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+            const minutes = Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60));
+            const seconds = Math.floor((difference % (1000 * 60)) / 1000);
+
+            // Función para añadir cero a la izquierda si es menor de 10
+            const format = (num) => num < 10 ? `0${num}` : num;
+
+            document.getElementById("days").innerText = days; // Los días pueden tener 3 o 4 dígitos, no forzamos el 0
+            document.getElementById("hours").innerText = format(hours);
+            document.getElementById("minutes").innerText = format(minutes);
+            document.getElementById("seconds").innerText = format(seconds);
+        }
+
+        setInterval(updateCountdown, 1000);
+        updateCountdown(); // Ejecutar inmediatamente para evitar el parpadeo inicial
+    </script>
+</body>
+</html>
